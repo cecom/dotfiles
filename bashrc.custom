@@ -1,0 +1,241 @@
+#!/usr/bin/env bash
+
+# ==========================================
+# CUSTOM BASH CONFIGURATION
+# ==========================================
+
+# Löscht alle vorherigen Prompt-Manager (wie Starship), die von Garuda geladen wurden!
+unset PROMPT_COMMAND
+
+# ==========================================
+# LOKALISIERUNG & ZEITZONE
+# ==========================================
+export LOC="de_DE.UTF-8"
+export LANG="${LOC}"
+export LC_CTYPE="${LOC}"
+export LC_NUMERIC="${LOC}"
+export LC_TIME="${LOC}"
+export LC_COLLATE="${LOC}"
+export LC_MONETARY="${LOC}"
+export LC_PAPER="${LOC}"
+export LC_NAME="${LOC}"
+export LC_ADDRESS="${LOC}"
+export LC_TELEPHONE="${LOC}"
+export LC_MEASUREMENT="${LOC}"
+export LC_IDENTIFICATION="${LOC}"
+
+# Fehler und Systemmeldungen auf Englisch
+export LC_MESSAGES="C"
+
+# Feste Zeitzone (hilfreich für WSL und Server)
+export TZ="Europe/Berlin"
+
+# Lösche LC_ALL, falls es vom OS gesetzt wurde, da es sonst 
+# unsere feingranularen Einstellungen oben gnadenlos überschreiben würde!
+unset LC_ALL
+
+# Befehle an die History anhängen statt überschreiben
+shopt -s histappend
+# Mehrzeilige Befehle als einen Eintrag speichern
+shopt -s cmdhist
+# ignorespace: Befehle mit Leerzeichen davor nicht speichern
+# ignoreboth:  Kombiniert ignorespace & ignoredups (keine aufeinanderfolgenden Dubletten)
+export HISTCONTROL=ignoreboth
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+
+# ==========================================
+# Zoxide (MUSS VOR DEM PROMPT STEHEN!)
+# ==========================================
+if command -v zoxide &> /dev/null; then
+    eval "$(zoxide init bash --cmd cd)"
+fi
+
+# ==========================================
+# fzf Init & Keybindings
+# ==========================================
+if [ -d "$HOME/.fzf/bin" ]; then
+    export PATH="$PATH:$HOME/.fzf/bin"
+fi
+
+if command -v fzf &> /dev/null; then
+    # Variante A: Manuelle Git-Installation (~/.fzf)
+    if [ -d "$HOME/.fzf" ]; then
+        # Lade Autocompletion (nur für interaktive Shells)
+        [[ $- == *i* ]] && source "$HOME/.fzf/shell/completion.bash" 2> /dev/null
+        # Lade Keybindings (Strg+R, Alt+C etc.)
+        source "$HOME/.fzf/shell/key-bindings.bash"
+
+    # Variante B: Arch Linux / Garuda (via pacman)
+    elif [ -f /usr/share/fzf/key-bindings.bash ]; then
+        source /usr/share/fzf/key-bindings.bash
+        source /usr/share/fzf/completion.bash
+
+    # Variante C: Debian / Ubuntu (via apt)
+    elif [ -f /usr/share/doc/fzf/examples/key-bindings.bash ]; then
+        source /usr/share/doc/fzf/examples/key-bindings.bash
+        source /usr/share/doc/fzf/examples/completion.bash
+    fi
+fi
+
+# ==========================================
+# Command not Found Handler
+# ==========================================
+# Sagt dir automatisch, welches Paket du installieren musst, wenn ein Befehl fehlt.
+if [ -f /etc/bash_command_not_found ]; then
+    # Debian / Ubuntu (Standard-Pfad)
+    source /etc/bash_command_not_found
+elif [ -x /usr/lib/command-not-found ]; then
+    # Ubuntu Fallback
+    command_not_found_handle() {
+        /usr/lib/command-not-found -- "$1"
+        return $?
+    }
+elif [ -f /usr/share/doc/pkgfile/command-not-found.bash ]; then
+    # Arch Linux / Garuda (via pkgfile)
+    source /usr/share/doc/pkgfile/command-not-found.bash
+fi
+
+# ==========================================
+# Custom Bash Prompt
+# ==========================================
+function build_prompt() {
+  local exit_status=$EXIT_STATUS
+  local time_now=$(date +%H:%M:%S)
+
+  # --- Farben definieren ---
+  local RESET="\[\e[0m\]"
+  local BOLD="\[\e[1m\]"
+  local GREEN="\[\e[32m\]"
+  local RED="\[\e[31m\]"
+  local BLUE="\[\e[34m\]"
+  local CYAN="\[\e[36m\]"
+  local GRAY="\[\e[90m\]"
+  local YELLOW="\[\e[33m\]"
+
+  # --- Root Check & Host Info ---
+  local host_color="${GREEN}"
+  local prompt_char="\$"
+  
+  if [ "$EUID" -eq 0 ]; then
+    host_color="${RED}"
+    prompt_char="#"
+  fi
+
+  local ip_addr=$(hostname -I 2>/dev/null | awk '{print $1}')
+  
+  local host_prompt=""
+  if [ -n "$ip_addr" ]; then
+    host_prompt="${host_color}\h ≙ ${ip_addr}${RESET}"
+  else
+    host_prompt="${host_color}\h${RESET}"
+  fi
+
+  # --- Exit Status ---
+  local status_prompt=""
+  if [ $exit_status -eq 0 ]; then
+    status_prompt="${GREEN}✔${RESET}"
+  else
+    status_prompt="${RED}✘ [${exit_status}]${RESET}"
+  fi
+
+  # --- Git Information ---
+  local git_branch=""
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local branch=$(git branch --show-current 2>/dev/null)
+    if [ -z "$branch" ]; then
+      branch=$(git rev-parse --short HEAD 2>/dev/null)
+    fi
+
+    local git_status_output=$(git status --porcelain --branch 2>/dev/null)
+    local git_details=""
+    
+    # Das Wort 'command' ignoriert Aliase wie 'ugrep' und nutzt das echte GNU grep!
+    if echo "$git_status_output" | command grep -v '^##' | command grep -q '^[MARCDU ]'; then
+      git_details+=" ${YELLOW}✎${RESET}"
+    fi
+    if echo "$git_status_output" | command grep -q '^?? '; then
+      git_details+=" ${RED}?${RESET}"
+    fi
+    if echo "$git_status_output" | command grep -q '\[.*ahead'; then
+      git_details+=" ${GREEN}↑${RESET}"
+    fi
+    if echo "$git_status_output" | command grep -q '\[.*behind'; then
+      git_details+=" ${RED}↓${RESET}"
+    fi
+
+    git_branch=" ${CYAN} ${branch}${RESET}${git_details}"
+  fi
+
+  # --- Prompt zusammenbauen ---
+  PS1="\n${GRAY}[${time_now}]${RESET} ${host_prompt} ${GRAY}|${RESET} ${status_prompt} ${BOLD}${BLUE}\w${RESET}${git_branch}\n${host_color}${prompt_char}${RESET} "
+}
+
+# Hängt unseren Code exakt an den Anfang des PROMPT_COMMANDS, noch VOR Zoxide!
+if [[ "$PROMPT_COMMAND" != *"build_prompt"* ]]; then
+    PROMPT_COMMAND="EXIT_STATUS=\$?; history -a; history -c; history -r; build_prompt; ${PROMPT_COMMAND:-}"
+fi
+
+# ==========================================
+# AUTOCOMPLETION & TAB-MENÜ
+# ==========================================
+# Groß-/Kleinschreibung ignorieren
+bind 'set completion-ignore-case on'
+# Zeigt die Liste sofort beim 1. Tab-Druck an
+bind 'set show-all-if-ambiguous on'
+# Aktiviere das Durchschalten! (1. Tab = Liste zeigen & ersten Treffer eintragen)
+bind 'TAB: menu-complete'
+# Mit Umschalt + Tab rückwärts durch die Liste schalten
+bind '"\e[Z": menu-complete-backward'
+
+# ==========================================
+# ALIASES (System & Navigation)
+# ==========================================
+
+# --- 1. Dateianzeige (ls & tree) ---
+# Standard 'ls' immer mit Farben und Verzeichnis-Indikatoren
+alias ls='ls --color=auto -F'
+# 'll' - Die Standard-Listenansicht (lesbare Dateigrößen wie '1.2G', versteckte Dateien ausgenommen)
+alias ll='ls -lh'
+# 'la' - Zeigt ALLES an (inklusive versteckter .Dateien) in Listenform
+alias la='ls -lah'
+# 'lt' - Sortiert nach Datum (neueste oben), extrem praktisch im Download-Ordner!
+alias lt='ls -lht'
+# 'tree' - Immer mit Farben ausgeben
+alias tree='tree -C'
+
+# --- 2. Navigation (Ordner hochspringen) ---
+alias ..='cd ..'
+alias ...='cd ../..'
+alias ....='cd ../../..'
+
+# --- 3. Suchen & Grep ---
+# Färbt Treffer im Standard-grep automatisch ein
+alias grep='grep --color=auto'
+alias egrep='egrep --color=auto'
+alias fgrep='fgrep --color=auto'
+# Falls 'rg' (ripgrep) installiert ist: Ignoriere Groß-/Kleinschreibung standardmäßig
+if command -v rg &> /dev/null; then
+    alias rg='rg --smart-case'
+fi
+
+# --- 4. Komfort & Sicherheit ---
+# Fragt nach, bevor Dateien überschrieben oder gelöscht werden
+alias rm='rm -I'
+alias cp='cp -i'
+alias mv='mv -i'
+# Zeigt offene Ports und lauschende Dienste an (braucht oft sudo)
+alias ports='ss -tulpn'
+# Lädt die Bashrc mit einem kurzen Befehl neu
+alias reload='source ~/.bashrc'
+
+# ==========================================
+# Terminal Hilfe-Funktion
+# ==========================================
+function getShortcuts() {
+    echo -e "\n\033[1;36m🔥 Die wichtigsten Terminal-Shortcuts:\033[0m\n"
+    echo -e "  \033[1;33mStrg + R\033[0m : 📜 Befehlshistorie interaktiv durchsuchen (fzf)"
+    echo -e "  \033[1;33mAlt + C\033[0m  : 📂 Unterordner interaktiv suchen & betreten (fzf)"
+    echo -e "  \033[1;33mcdi\033[0m      : 🚀 Interaktiv zu häufigen Ordnern springen (zoxide + fzf)"
+    echo -e "  \033[1;33mcd <Name>\033[0m: ⚡ Direkt zu häufigem Ordner springen (zoxide)\n"
+}

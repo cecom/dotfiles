@@ -1,0 +1,144 @@
+# ==========================================
+# BENUTZER & IDENTITÄT
+# ==========================================
+[user]
+    name = Sven Oppermann
+    email = sven.oppermann@iosus.de
+
+# ==========================================
+# GRUNDLEGENDES VERHALTEN
+# ==========================================
+[init]
+    # Standard-Branch für neue Repositories
+    defaultBranch = main
+
+[core]
+    # Erlaubt das Anzeigen von Umlauten und Sonderzeichen in Dateipfaden
+    quotepath = off
+    # Beschleunigt Git bei Repositories mit vielen Dateien
+    preloadindex = true
+    # Pager-Einstellungen für lange Ausgaben (z.B. bei 'git diff' oder 'git log')
+    pager = less -FRSXj.5
+    # Standard-Editor
+    editor = vi
+    
+    # -- DEBUGGING --
+    # sshCommand = "ssh -vvv"
+
+# ==========================================
+# LOKALISIERUNG & OPTIK
+# ==========================================
+[color]
+    # Automatische Einfärbung der Konsolenausgabe
+    ui = auto
+
+[i18n]
+    # Standard-Encoding
+    commitencoding = utf-8
+    logoutputencoding = utf-8
+
+# ==========================================
+# BRANCHING, PUSH & PULL
+# ==========================================
+[push]
+    # Pusht den aktuellen Branch immer auf einen gleichnamigen Remote-Branch
+    default = current
+
+[pull]
+    # Verhindert Merge-Commits beim Pullen (nutzt Rebase)
+    rebase = true
+
+[remote]
+    # Definiert 'origin' als Standard für Push-Vorgänge
+    pushdefault = origin
+
+[fetch]
+    # Entfernt lokale Tracking-Branches, wenn sie auf 'origin' gelöscht wurden
+    prune = true
+
+# ==========================================
+# WORKFLOW TOOLS (Rebase & Rerere)
+# ==========================================
+[rebase]
+    # Stasht ungespeicherte Änderungen automatisch vor einem Rebase und popt sie danach
+    autoStash = true
+
+[rerere]
+    # Reuse Recorded Resolution: Merkt sich gelöste Merge-Konflikte und wendet sie automatisch wieder an
+    enabled = true
+
+[help]
+    # Autokorrektur bei Tippfehlern (z.B. 'git ststus' -> 'git status')
+    autocorrect = prompt
+
+# ==========================================
+# MERGE & DIFF TOOLS (Meld)
+# ==========================================
+[diff]
+    tool = meld
+[difftool]
+    prompt = false
+[difftool "meld"]
+    cmd = meld "$LOCAL" "$REMOTE"
+    keepTemporaries = false
+    keepBackup = false
+
+[merge]
+    tool = meld
+[mergetool "meld"]
+    cmd = meld "$LOCAL" "$BASE" "$REMOTE" --output "$MERGED"
+    keepBackup = false
+
+# ==========================================
+# GIT LARGE FILE STORAGE (LFS)
+# ==========================================
+[filter "lfs"]
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+
+# ==========================================
+# ALIASES (Eigene Befehle)
+# ==========================================
+[alias]
+    # Zeigt den Status der Workarea und des Index an (Kompakt).
+    s = status -sb
+    
+    # Zeigt die Commit-Historie schön formatiert an (Graph-Optik).
+    lg = log --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr %an)%Creset' --abbrev-commit --date=relative
+    
+    # Zeigt die letzten 10 benutzten Branches an, sortiert nach letzter Nutzung.
+    b = for-each-ref --count=10 --sort=-committerdate refs/heads/ --format='%(refname:short)'
+    
+    # Amend last commit: Fügt alle geänderten Dateien zum letzten Commit hinzu, ohne die Message zu ändern.
+    ac = commit -a --amend --no-edit 
+    
+    # Committe alles was git schon kennt
+    cm = commit -am
+    
+    # ==========================================
+    # PUSH & BRANCH MANAGEMENT
+    # ==========================================
+    # SICHERER Force-Push!
+    # Pusht deine überschriebene Historie (nach Amend/Rebase), bricht aber sofort ab, 
+    # falls ein Kollege etwas auf denselben Remote-Branch gepusht hat.
+    pf = push --force-with-lease
+    
+    # Gibt den aktuellen Branch aus 
+    currentbranch = branch --show-current
+    
+    # Gibt für den aktuellen (oder übergebenen) Branch den hinterlegten Remote aus.
+    currentremote = "!sh -c \"if [ $# -eq 0 ] ; then git config branch.$(git currentbranch).remote; else git config branch.$1.remote; fi\""
+    
+    # Gibt für den aktuellen (oder übergebenen) Branch den hinterlegten Merge-Branch aus.
+    currentmergebranch = "!sh -c \"if [ $# -eq 0 ] ; then git config branch.$(git currentbranch).merge | sed -e 's#^refs/heads/##'; else git config branch.$1.merge | sed -e 's#^refs/heads/##'; fi\""                      
+    
+    # Zeigt alle Dateien, die im aktuellen Branch ggü. dem Remote geändert wurden.                              
+    dt = "!sh -c \"if [ -z \\\"$(git currentremote)\\\" ] ; then echo 'Branch ist nicht richtig konfiguriert!' ; else git diff-tree -r --name-status $(if [ \\\"$(git currentremote)\\\" != '.' ] ; then echo \\\"$(git currentremote)/\\\" ; fi)$(git currentmergebranch)..HEAD ; fi\""
+    
+    # Zeigt alle Commits und geänderte Dateien an, die sich zum Remote-Branch geändert haben.
+    lgb = "!sh -c \"if [ -z \\\"$(git currentremote)\\\" ] ; then echo 'Branch ist nicht richtig konfiguriert!' ; else git lg --no-merges --name-status $(if [ \\\"$(git currentremote)\\\" != '.' ] ; then echo \\\"$(git currentremote)/\\\" ; fi)$(git currentmergebranch)..HEAD ; fi\""
+    
+    # Pull Requests fetchen
+    pr = !sh -c \"git fetch origin pull-requests/${1}/from:pr/${1}\" -

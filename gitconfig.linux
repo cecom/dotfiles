@@ -1,0 +1,5 @@
+[core]
+    autocrlf = input
+    filemode = true
+[credential]
+    helper = cache --timeout=3600

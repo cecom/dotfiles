@@ -1,0 +1,3 @@
+bashrc.custom    linguist-language=Shell
+gitconfig.custom linguist-language=INI
+tmux.conf.custom linguist-language=tmux

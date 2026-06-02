@@ -1,0 +1,96 @@
+# ==========================================
+# 1. GRUNDEINSTELLUNGEN
+# ==========================================
+set -g default-command "${SHELL}"
+
+# 256-Farben und TrueColor (RGB) Unterstützung aktivieren (Wichtig für Neovim)
+set -g default-terminal "tmux-256color"
+set -sa terminal-overrides ",xterm*:Tc"
+set -as terminal-features ',tmux-256color:RGB'
+
+set -g history-limit 30000
+set -s escape-time 0          # Keine Verzögerung bei ESC (wichtig für Vim/Neovim)
+set -g base-index 1           # Fenster-Nummerierung beginnt bei 1 (statt 0)
+set -g renumber-windows on    # Fenster nach dem Schließen neu nummerieren
+set -g allow-rename off       # Verhindert, dass Programme die Fensternamen überschreiben
+set -g focus-events on
+
+# ==========================================
+# 2. MAUS & CLIPBOARD
+# ==========================================
+set -g mouse on
+set -g set-clipboard on       # Erlaubt modernen Terminals (wie Konsole/Windows Terminal) den direkten Clipboard-Zugriff
+
+# Erlaube Mausrad-Scrolling
+bind-key -n WheelUpPane if-shell -F -t = "#{mouse_any_flag}" "send-keys -M" "if -Ft= '#{pane_in_mode}' 'send-keys -M' 'copy-mode -e; send-keys -M'"
+
+# Deaktiviere das rechte Maus-Menü in Tmux (nützlich für Terminal-natives Paste)
+unbind -n MouseDown3Pane
+
+# ==========================================
+# 3. KEYBINDINGS (PREFIX & NAVIGATION)
+# ==========================================
+# Prefix von C-b auf C-q ändern
+unbind C-q
+set-option -g prefix C-q
+bind-key -n M-q send-prefix
+
+# Intuitive Fenster-Splits (und aktueller Pfad wird übernommen)
+bind | split-window -h -c "#{pane_current_path}"
+bind - split-window -v -c "#{pane_current_path}"
+unbind '"'
+unbind %
+
+# Fenster-Navigation
+bind-key a last-window
+bind-key C-Left previous-window
+bind-key C-Right next-window
+
+# Pane-Navigation (mit Pfeiltasten)
+bind-key Left select-pane -L
+bind-key Right select-pane -R
+bind-key Up select-pane -U
+bind-key Down select-pane -D
+
+# Synchronisiere Panes (Gleichzeitiges Tippen in allen Splits)
+bind-key s set-window-option synchronize-panes \; display-message "synchronize-panes is now #{?pane_synchronized,on,off}"
+
+# ==========================================
+# 4. COPY MODE (VI-STYLE)
+# ==========================================
+setw -g mode-keys vi
+
+# Copy-Mode mit Enter statt '[' starten
+bind Enter copy-mode
+unbind [
+
+# Paste Buffer
+bind p paste-buffer -p                 
+bind P choose-buffer -F "#{=60:buffer_sample}"
+
+# Vi-Copy-Bindings (ohne WSL clip.exe, nutzt Tmux-internes Clipboard + Terminal-Clipboard)
+unbind -T copy-mode-vi Enter
+bind-key -T copy-mode-vi v send-keys -X begin-selection
+bind-key -T copy-mode-vi y send-keys -X copy-selection-and-cancel
+bind-key -T copy-mode-vi Enter send-keys -X copy-selection-and-cancel
+
+# ==========================================
+# 5. OPTIK & THEME
+# ==========================================
+# Keine nervigen Sounds oder visuelle Blitze
+set -g bell-action none
+set -g visual-bell off
+
+# Hintergrundfarben für aktives/inaktives Pane
+set -g window-style 'fg=terminal,bg=colour233'
+set -g window-active-style 'fg=terminal,bg=#262626'
+
+# Tmux Power Theme Konfiguration
+set -g @tmux_power_theme 'gold'
+set -g @tmux_power_show_gitmux true
+set -g @tmux_power_mode_indicator true
+
+# Lade die externen Theme-Dateien (werden vom setupEnv.sh heruntergeladen)
+run-shell ~/.config/tmux/plugins/tmux-power/tmux-power.tmux
+set -ga status-left " #{tmux_mode_indicator}"
+run-shell ~/.config/tmux/plugins/tmux-mode-indicator/mode_indicator.tmux

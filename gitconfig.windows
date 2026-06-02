@@ -1,0 +1,8 @@
+[core]
+    autocrlf = true
+    filemode = false
+    ignorecase = false
+    fscache = true
+    longpaths = true
+[credential]
+    helper = manager-core
